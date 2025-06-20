@@ -1,26 +1,8 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const Database = require('better-sqlite3');
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
-
-// Set up SQLite DB
-const db = new Database('./ussd_responses.db');
-console.log('✅ Connected to SQLite database');
-
-// Create table if not exists
-db.prepare(`
-    CREATE TABLE IF NOT EXISTS responses (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        sessionId TEXT,
-        phoneNumber TEXT,
-        language TEXT,
-        category TEXT,
-        food TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-`).run();
 
 app.post('/ussd', (req, res) => {
     const { sessionId, phoneNumber, text } = req.body;
@@ -79,33 +61,20 @@ app.post('/ussd', (req, res) => {
                 response = `CON Hitamo icyiciro:\n1. Ibiryo byihuse\n2. Ibiryo gakondo\n3. Gusubira inyuma`;
             }
         } else {
-            // Save response to DB
-            let language = lang === '1' ? 'English' : 'Kinyarwanda';
-            let categoryName = '';
             let foodName = '';
 
             if (lang === '1') {
-                categoryName = category === '1' ? 'Fast Food' : 'Traditional';
                 if (category === '1') {
                     foodName = foodOption === '1' ? 'Chips and Chicken' : 'Burger';
                 } else {
                     foodName = foodOption === '1' ? 'Cassava Bread' : 'Beef and Plantain';
                 }
             } else {
-                categoryName = category === '1' ? 'Ibiryo byihuse' : 'Ibiryo gakondo';
                 if (category === '1') {
                     foodName = foodOption === '1' ? 'Ifiriti n’Inkoko' : 'Burger';
                 } else {
                     foodName = foodOption === '1' ? 'Ubugari' : 'Agatogo';
                 }
-            }
-
-            try {
-                db.prepare(`INSERT INTO responses (sessionId, phoneNumber, language, category, food)
-                            VALUES (?, ?, ?, ?, ?)`)
-                  .run(sessionId, phoneNumber, language, categoryName, foodName);
-            } catch (err) {
-                console.error(err.message);
             }
 
             response = `END Your favourite food is ${foodName}. Thank you!`;
