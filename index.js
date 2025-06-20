@@ -1,18 +1,16 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 
 // Set up SQLite DB
-const db = new sqlite3.Database('./ussd_responses.db', (err) => {
-    if (err) console.error(err.message);
-    else console.log('✅ Connected to SQLite database');
-});
+const db = new Database('./ussd_responses.db');
+console.log('✅ Connected to SQLite database');
 
-// Create table
-db.run(`
+// Create table if not exists
+db.prepare(`
     CREATE TABLE IF NOT EXISTS responses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         sessionId TEXT,
@@ -22,7 +20,7 @@ db.run(`
         food TEXT,
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )
-`);
+`).run();
 
 app.post('/ussd', (req, res) => {
     const { sessionId, phoneNumber, text } = req.body;
@@ -102,12 +100,13 @@ app.post('/ussd', (req, res) => {
                 }
             }
 
-            db.run(`INSERT INTO responses (sessionId, phoneNumber, language, category, food)
-                    VALUES (?, ?, ?, ?, ?)`,
-                [sessionId, phoneNumber, language, categoryName, foodName],
-                (err) => {
-                    if (err) console.error(err.message);
-                });
+            try {
+                db.prepare(`INSERT INTO responses (sessionId, phoneNumber, language, category, food)
+                            VALUES (?, ?, ?, ?, ?)`)
+                  .run(sessionId, phoneNumber, language, categoryName, foodName);
+            } catch (err) {
+                console.error(err.message);
+            }
 
             response = `END Your favourite food is ${foodName}. Thank you!`;
         }
@@ -119,7 +118,7 @@ app.post('/ussd', (req, res) => {
     res.send(response);
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`✅ USSD app running on port ${PORT}`);
 });
